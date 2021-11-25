@@ -17,12 +17,12 @@ Napi::Value Method(const Napi::CallbackInfo& info) {
         Napi::TypeError::New(env, "Wrong arguments").ThrowAsJavaScriptException();
         return env.Null();
     }
-    string syka = info[0].As<Napi::String>();
+    string gggg = info[0].As<Napi::String>();
     stringstream ssFilePath;
-    ssFilePath << syka;
+    ssFilePath << gggg;
     cout << "Path: " << ssFilePath.str().c_str();
     int result = SystemParametersInfoA(SPI_SETDESKWALLPAPER, 0, (PVOID)ssFilePath.str().c_str(), SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
-    return Napi::String::New(env, syka);
+    return Napi::String::New(env, gggg);
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
