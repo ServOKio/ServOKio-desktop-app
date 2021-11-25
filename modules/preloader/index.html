@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Hello World!</title>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="style.css" rel="stylesheet">
+</head>
+
+<body>
+  <div class="center">
+    <div class="circle">
+      <div class="inner"></div>
+    </div>
+  </div>
+  <div class="debug">
+    <div class="block">Node <span>
+        <script>document.write(process.versions.node)</script></span></div>
+    <div class="block">Chrome <span>
+        <script>document.write(process.versions.chrome)</script></span></div>
+    <div class="block">Electron <span>
+        <script>document.write(process.versions.electron)</script></span></div>
+    <div class="block">HOME <span>
+        <script>document.write(process.env.HOME)</script></span></div>
+  </div>
+  <script>
+    window.sapi.receive("fromMain", (data) => {
+      console.log(`Received ${data} from main process`);
+    });
+    window.sapi.send("toMain", "some data");
+  </script>
+</body>
+
+</html>

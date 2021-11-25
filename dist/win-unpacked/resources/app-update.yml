@@ -1,0 +1,3 @@
+provider: generic
+url: 'https://servokio.ru/updates/ptb'
+updaterCacheDirName: servokio-updater

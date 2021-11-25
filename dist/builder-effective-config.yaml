@@ -1,0 +1,61 @@
+directories:
+  output: dist
+  buildResources: build
+appId: net.servokio.app
+productName: ServOKio
+copyright: Copyright (C) 2013 ServOKio
+nodeGypRebuild: true
+files:
+  - filter:
+      - '**/*'
+      - '**/addons/*.node'
+      - '!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}'
+      - '!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}'
+      - '!**/node_modules/*.d.ts'
+      - '!**/node_modules/.bin'
+      - '!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}'
+      - '!.editorconfig'
+      - '!changeVersion.js'
+      - '!**/build'
+      - '!**/server_scripts'
+      - '!**/._*'
+      - '!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}'
+      - '!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}'
+      - '!**/{appveyor.yml,.travis.yml,circle.yml}'
+      - '!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}'
+win:
+  target:
+    - target: portable
+    - target: nsis
+  icon: ./favicon-194x194.ico
+  publish:
+    provider: generic
+    url: 'https://servokio.ru/updates/ptb'
+squirrelWindows:
+  msi: true
+  iconUrl: 'https://servokio.ru/favicon.ico'
+nsisWeb:
+  installerIcon: ./favicon-194x194.ico
+  uninstallerIcon: ./favicon-194x194.ico
+  appPackageUrl: 'https://servokio.ru/updates/web'
+nsis:
+  installerIcon: ./favicon-194x194.ico
+  uninstallerIcon: ./favicon-194x194.ico
+  artifactName: '${productName}_Setup_${version}.${ext}'
+portable:
+  artifactName: '${productName}_Portable_${version}.${ext}'
+linux:
+  target:
+    - deb
+    - snap
+    - rpm
+    - AppImage
+  category: Utility
+  icon: ./linux_256.png
+  executableName: ServOKio
+  publish:
+    - provider: generic
+      url: 'https://servokio.ru/updates/linux'
+afterPack: ./server_scripts/afterPackHook.js
+artifactBuildCompleted: ./server_scripts/artifactBuildCompleted.js
+electronVersion: 9.4.3
