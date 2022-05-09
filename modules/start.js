@@ -1,41 +1,49 @@
 const
     SplashWindow = require('./splashWindow.js'),
     { spawn } = require('child_process'),
-    { app, BrowserWindow, ipcMain, shell, Menu, Tray, protocol, dialog, autoUpdater, remote, nativeImage } = require('electron'),
+    { app, BrowserWindow, ipcMain, shell, Menu, Tray, protocol, dialog, autoUpdater, remote, nativeImage, Notification } = require('electron'),
     path = require("path"),
     newAutoUpdater = require("electron-updater").autoUpdater,
-    fs = require("fs");
+    fs = require("fs"),
+    xml = require('xml'),
+    os = require('os'),
+    crypto = require('crypto');
 
 class Start {
-    constructor(options = {}) {
+    constructor(props = {}) {
+        this.main = props.main;
+        this.tempF = path.join(os.tmpdir(), 'servokio');
     }
 
     start(data) {
         console.log('Starting');
 
-        const os = require('os').platform();
-
         console.log('Hi');
         console.log(`App version: ${data.app.getVersion()}`);
-        console.log(`Platform: ${os}`);
+        console.log(`Platform: ${os.platform()}`);
 
-        data.self.splashWindow = new SplashWindow();
-        data.self.splashWindow.init(data.self.settings, data.app, () => data.self.mainWindow == null, () => {
+        app.setAppUserModelId('net.servokio.app');
+
+        if (!fs.existsSync(this.tempF)) fs.mkdirSync(this.tempF);
+
+        //Display splash
+        this.main.splashWindow = new SplashWindow();
+        this.main.splashWindow.init(this.main.settings, data.app, () => this.main.mainWindow == null, () => {
             console.log('Splash initlfsidf koro4e done');
             this.check_status(data);
         });
 
         if (process.platform === 'win32') {
-            const queryValue = ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', data.self.settings.appName];
+            const queryValue = ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', this.main.settings.appName];
             queryValue.unshift('query');
-            const test_auto_start = spawn(data.self.settings.regExe, queryValue);
+            const test_auto_start = spawn(this.main.settings.regExe, queryValue);
             let stdout = '';
             test_auto_start.stdout.on('data', (data) => {
                 stdout += data;
             });
             test_auto_start.on('close', (code, signal) => {
-                const doesOldKeyExist = stdout.indexOf(data.self.settings.appName) >= 0;
-                data.self.local_settings.set('app_launch_with_the_system', doesOldKeyExist);
+                const doesOldKeyExist = stdout.indexOf(this.main.settings.appName) >= 0;
+                this.main.local_settings.set('app_launch_with_the_system', doesOldKeyExist);
             });
         }
 
@@ -46,7 +54,7 @@ class Start {
                 {
                     label: 'Show App',
                     click: () => {
-                        if (data.self.mainWindow) data.self.mainWindow.show();
+                        if (this.main.mainWindow) this.main.mainWindow.show();
                     }
                 },
                 {
@@ -56,16 +64,16 @@ class Start {
                             label: 'Поверх всех окон',
                             sublabel: 'Приложение будет всегда впереди',
                             type: 'checkbox',
-                            checked: data.self.local_settings.get('app_always_on_top'),
+                            checked: this.main.local_settings.get('app_always_on_top'),
                             click: (e) => {
-                                if (data.self.mainWindow) {
-                                    data.self.mainWindow.webContents.send("fromMain", {
+                                if (this.main.mainWindow) {
+                                    this.main.mainWindow.webContents.send("fromMain", {
                                         type: 'change_setting',
                                         setting: 'app_always_on_top',
                                         value: e.checked
                                     });
-                                    data.self.local_settings.set('app_always_on_top', e.checked);
-                                    data.self.mainWindow.setAlwaysOnTop(e.checked);
+                                    this.main.local_settings.set('app_always_on_top', e.checked);
+                                    this.main.mainWindow.setAlwaysOnTop(e.checked);
                                 }
                                 console.log(e.checked)
                             }
@@ -78,9 +86,9 @@ class Start {
                                     label: 'Стандарт',
                                     sublabel: 'По центру экрана, стандартный размер',
                                     click: () => {
-                                        data.self.local_data.set('app_position', {
+                                        this.main.local_data.set('app_position', {
                                             type: 'default',
-                                            bounds: data.self.local_data.get('app_position').bounds
+                                            bounds: this.main.local_data.get('app_position').bounds
                                         });
                                     }
                                 },
@@ -88,9 +96,9 @@ class Start {
                                     label: 'Текущая',
                                     sublabel: 'Запомнить текущую позицию и размеры',
                                     click: () => {
-                                        data.self.local_data.set('app_position', {
+                                        this.main.local_data.set('app_position', {
                                             type: 'custom',
-                                            bounds: data.self.mainWindow.getBounds()
+                                            bounds: this.main.mainWindow.getBounds()
                                         });
                                     }
                                 }
@@ -119,8 +127,8 @@ class Start {
                 {
                     label: 'Проверить обновления',
                     click: () => {
-                        if (data.self.useElectronUpdater) {
-                            newAutoUpdater.checkForUpdatesAndNotify();
+                        if (this.main.useElectronUpdater) {
+                            newAutoUpdater.checkForUpdates();
                         } else {
                             autoUpdater.checkForUpdates();
                         }
@@ -130,44 +138,41 @@ class Start {
                     label: 'Close ' + require('./../package.json').version,
                     click: () => {
                         console.log('close')
-                        if (data.self.splashWindow) data.self.splashWindow.end();
-                        if (data.self.mainWindow) data.self.mainWindow.close();
-                        if (data.self.autoupdater_interval !== null) clearInterval(data.self.autoupdater_interval);
-                        if (data.self.wallpaper !== null && data.self.wallpaper.active) data.self.wallpaper.end();
+                        if (this.main.splashWindow) this.main.splashWindow.end();
+                        if (this.main.mainWindow) this.main.mainWindow.close();
+                        if (this.main.autoupdater_interval !== null) clearInterval(this.main.autoupdater_interval);
+                        if (this.main.modules.wallpaper !== null && this.main.modules.wallpaper.active) this.main.modules.wallpaper.end();
                     }
                 }
             ]);
             tray.setToolTip('ServOKio');
             tray.setContextMenu(contextMenu);
             tray.on('click', () => {
-                if (data.self.mainWindow) data.self.mainWindow.show();
+                if (this.main.mainWindow) this.main.mainWindow.show();
             });
-            console.log(tray.isDestroyed())
 
             console.log('Register protocol')
             protocol.interceptFileProtocol('file', (scheme, callback) => {
                 const url = scheme.url.substr(8);
                 if (url) {
                     callback({ url: path.normalize(`${__dirname}/${url}`) })
-                } else {
-                    console.error('Failed to register protocol');
-                }
+                } else console.error('Failed to register protocol');
             });
         });
     }
 
     check_status(data) {
         function isJson(str) { try { JSON.parse(str); } catch (e) { return false; } return true; }
-        const getter = data.self.settings.servokio_stats_url.startsWith('https') ? require('https') : require('http');
-        console.log(`Stats from ${data.self.settings.servokio_stats_url}`);
-        getter.get(data.self.settings.servokio_stats_url, (res) => {
+        const getter = this.main.settings.servokio_stats_url.startsWith('https') ? require('https') : require('http');
+        console.log(`Stats from ${this.main.settings.servokio_stats_url}`);
+        getter.get(this.main.settings.servokio_stats_url, (res) => {
             const { statusCode } = res;
             if (statusCode !== 200) {
                 console.error("Error getting update information");
-                console.log(`A new attempt to get information will be made via: ${data.self.settings.retry_after_error}ms`);
+                console.log(`A new attempt to get information will be made via: ${this.main.settings.retry_after_error}ms`);
                 setTimeout(() => {
-                    this.check_status();
-                }, data.self.settings.retry_after_error);
+                    this.check_status(data);
+                }, this.main.settings.retry_after_error);
             } else {
                 res.setEncoding('utf8');
                 let rawData = '';
@@ -175,8 +180,8 @@ class Start {
                 res.on('end', () => {
                     if (isJson(rawData)) {
                         const stats = JSON.parse(rawData);
-                        if (!data.self.develop.enable) {
-                            if (data.self.useElectronUpdater) {
+                        if (!this.main.develop.enable) {
+                            if (this.main.useElectronUpdater) {
                                 console.log('Use new updater');
                                 this.setupAutoUpdaterEvents(data);
                             } else {
@@ -205,70 +210,79 @@ class Start {
                             // });
                         }
                         this.startMain(data);
-                    } else {
-                        console.error("The server returned an invalid response.")
-                    }
+                    } else console.error("The server returned an invalid response.")
                 });
             }
         }).on('error', (err) => {
             console.error("Error: " + err);
-            console.log(`A new attempt to get information will be made via: ${settings.retry_after_error}ms`);
+            console.log(`A new attempt to get information will be made via: ${this.main.settings.retry_after_error}ms`);
             setTimeout(() => {
-                data.self.check_status();
-            }, data.self.settings.retry_after_error);
+                this.check_status(data);
+            }, this.main.settings.retry_after_error);
         })
     }
 
     setupAutoUpdaterEvents(data) {
         //Check
 
-        if (data.self.useElectronUpdater) {
+        if (this.main.useElectronUpdater) {
             console.log(`Update channel: ${newAutoUpdater.channel}`);
         } else {
             console.log(`Update url: ${autoUpdater.getFeedURL()}`);
         }
 
         setTimeout(() => {
-            if (data.self.useElectronUpdater) {
-                newAutoUpdater.checkForUpdatesAndNotify();
+            if (this.main.useElectronUpdater) {
+                newAutoUpdater.checkForUpdates();
             } else {
                 autoUpdater.checkForUpdates();
             }
         }, 10 * 1000);
 
-        data.self.autoupdater_interval = setInterval(() => {
-            if (data.self.useElectronUpdater) {
-                newAutoUpdater.checkForUpdatesAndNotify();
+        this.main.autoupdater_interval = setInterval(() => {
+            if (this.main.useElectronUpdater) {
+                newAutoUpdater.checkForUpdates();
             } else {
                 autoUpdater.checkForUpdates();
             }
         }, 10 * 1000 * 60);
 
-        if (data.self.useElectronUpdater) {
+        if (this.main.useElectronUpdater) {
             newAutoUpdater.on('error', (error) => {
                 console.error(`Error on update: ${error.message}`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'error' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'error' });
                 console.error(error);
             });
 
             newAutoUpdater.on('checking-for-update', () => {
                 console.log(`Check for updates`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'checking' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'checking' });
             });
 
             newAutoUpdater.on('update-available', () => {
                 console.log(`An update is available`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'available' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'available' });
             });
 
             newAutoUpdater.on('update-not-available', () => {
                 console.log(`No updates found`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'not_available' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'not_available' });
             });
 
             newAutoUpdater.on('update-downloaded', (event, releaseNotes, releaseName, releaseDate, updateURL) => {
                 console.log(`New update: ${releaseDate}`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'downloaded' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'downloaded' });
+                const n = new Notification({
+                    title: 'Update is ready',
+                    body: 'Just click "update"',
+                    silent: true,
+                    icon: path.join(__dirname, '..', '256x256.ico'),
+                    closeButtonText: 'close',
+                });
+                n.on('click', _ => {
+                    if (this.main.useElectronUpdater) newAutoUpdater.quitAndInstall();
+                })
+                n.show();
             });
 
             newAutoUpdater.on('before-quit-for-update', () => {
@@ -277,28 +291,28 @@ class Start {
         } else {
             autoUpdater.on('error', (error) => {
                 console.error(`Error on update: ${error.message}`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'error' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'error' });
                 console.error(error);
             });
 
             autoUpdater.on('checking-for-update', () => {
                 console.log(`Check for updates`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'checking' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'checking' });
             });
 
             autoUpdater.on('update-available', () => {
                 console.log(`An update is available`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'available' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'available' });
             });
 
             autoUpdater.on('update-not-available', () => {
                 console.log(`No updates found`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'not_available' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'not_available' });
             });
 
             autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName, releaseDate, updateURL) => {
                 console.log(`New update: ${releaseDate}`);
-                if (data.self.mainWindow !== null) data.self.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'downloaded' });
+                if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'downloaded' });
             });
 
             autoUpdater.on('before-quit-for-update', () => {
@@ -307,29 +321,29 @@ class Start {
         }
     }
 
-    startMain(data) {
+    startMain() {
         console.log("Start main");
-        data.self.updateSounds();
-        if (data.self.mainWindow === null) {
-            console.log("Start main null - ok");
-            data.self.mainWindow = new BrowserWindow(data.self.settings.main_screen_settings);
+        this.main.modules.wallpaper.init();
+        this.main.modules.music.updateSounds();
 
-            data.self.mainWindow.webContents.once('new-window', (e, windowURL) => {
+        if (this.main.mainWindow === null) {
+            console.log("Start main null - ok");
+            this.main.mainWindow = new BrowserWindow(this.main.settings.main_screen_settings);
+
+            this.main.mainWindow.webContents.once('new-window', (e, windowURL) => {
                 console.log(windowURL)
                 e.preventDefault();
                 shell.openExternal(windowURL);
             });
 
-            data.self.mainWindow.webContents.once('dom-ready', () => {
+            this.main.mainWindow.webContents.once('dom-ready', () => {
                 console.log('main loaded');
-                if (data.self.splashWindow) {
-                    setTimeout(() => data.self.splashWindow.nukeWindow(), 100);
-                }
+                if (this.main.splashWindow) setTimeout(() => this.main.splashWindow.nukeWindow(), 100);
 
-                data.self.mainWindow.show();
-                data.self.mainWindow.setAlwaysOnTop(data.self.local_settings.get('app_always_on_top'));
-                if (data.self.local_data.get('app_position').type === 'custom') data.self.mainWindow.setBounds(data.self.local_data.get('app_position').bounds);
-                if (data.self.develop.enable) data.self.mainWindow.webContents.openDevTools();
+                this.main.mainWindow.show();
+                this.main.mainWindow.setAlwaysOnTop(this.main.local_settings.get('app_always_on_top'));
+                if (this.main.local_data.get('app_position').type === 'custom') this.main.mainWindow.setBounds(this.main.local_data.get('app_position').bounds);
+                if (this.main.develop.enable) this.main.mainWindow.webContents.openDevTools();
             });
 
             const isMac = process.platform === 'darwin'
@@ -380,10 +394,10 @@ class Start {
                                 ]
                             }
                         ] : [
-                                { role: 'delete' },
-                                { type: 'separator' },
-                                { role: 'selectAll' }
-                            ])
+                            { role: 'delete' },
+                            { type: 'separator' },
+                            { role: 'selectAll' }
+                        ])
                     ]
                 },
                 // { role: 'viewMenu' }
@@ -413,8 +427,8 @@ class Start {
                             { type: 'separator' },
                             { role: 'window' }
                         ] : [
-                                { role: 'close' }
-                            ])
+                            { role: 'close' }
+                        ])
                     ]
                 },
                 {
@@ -436,16 +450,16 @@ class Start {
                             label: 'Поверх всех окон',
                             sublabel: 'Приложение будет всегда впереди',
                             type: 'checkbox',
-                            checked: data.self.local_settings.get('app_always_on_top'),
+                            checked: this.main.local_settings.get('app_always_on_top'),
                             click: (e) => {
-                                if (data.self.mainWindow) {
-                                    data.self.mainWindow.webContents.send("fromMain", {
+                                if (this.main.mainWindow) {
+                                    this.main.mainWindow.webContents.send("fromMain", {
                                         type: 'change_setting',
                                         setting: 'app_always_on_top',
                                         value: e.checked
                                     });
-                                    data.self.local_settings.set('app_always_on_top', e.checked);
-                                    data.self.mainWindow.setAlwaysOnTop(e.checked);
+                                    this.main.local_settings.set('app_always_on_top', e.checked);
+                                    this.main.mainWindow.setAlwaysOnTop(e.checked);
                                 }
                                 console.log(e.checked)
                             }
@@ -458,9 +472,9 @@ class Start {
                                     label: 'Стандарт',
                                     sublabel: 'По центру экрана, стандартный размер',
                                     click: () => {
-                                        data.self.local_data.set('app_position', {
+                                        this.main.local_data.set('app_position', {
                                             type: 'default',
-                                            bounds: data.self.local_data.get('app_position').bounds
+                                            bounds: this.main.local_data.get('app_position').bounds
                                         });
                                     }
                                 },
@@ -468,9 +482,9 @@ class Start {
                                     label: 'Текущая',
                                     sublabel: 'Запомнить текущую позицию и размеры',
                                     click: () => {
-                                        data.self.local_data.set('app_position', {
+                                        this.main.local_data.set('app_position', {
                                             type: 'custom',
-                                            bounds: data.self.mainWindow.getBounds()
+                                            bounds: this.main.mainWindow.getBounds()
                                         });
                                     }
                                 }
@@ -480,7 +494,7 @@ class Start {
                 },
             ]));
 
-            data.self.mainWindow.loadURL(data.self.develop.enable ? 'http://localhost:3000/app/music/life' : 'https://servokio.ru/app');
+            this.main.mainWindow.loadURL(this.main.develop.enable ? 'http://localhost:3000/app/music/life' : 'https://servokio.ru/app');
 
             let images = [];
             function updateImages() {
@@ -528,148 +542,153 @@ class Start {
                 const startTimestamp = new Date();
                 switch (sData.type) {
                     case "get_local_sounds":
-                        data.self.sounds.sort((a, b) => {
-                            return (b.meta.listenings + b.meta.seeked_listenings) - (a.meta.listenings + a.meta.seeked_listenings);
-                        });
-                        //console.log(data.self.sounds.filter(s => s.meta.listenings > 0))
-                        event.returnValue = data.self.sounds;
+                        event.returnValue = this.main.modules.music.getSounds();
                         break;
                     case "get_local_images":
                         event.returnValue = images;
                         break;
                     case "close_app":
-                        if (data.self.mainWindow) data.self.mainWindow.hide();
+                        if (this.main.mainWindow) this.main.mainWindow.hide();
                         break;
                     case "music.update.listenings":
-                        const listenings = data.self.music_data.get('tracks');
+                        const listenings = this.main.modules.music.music_data.get('tracks');
                         if (!listenings[sData.id]) listenings[sData.id] = { listenings: 0 }
                         listenings[sData.id].listenings++;
-                        data.self.music_data.set('tracks', listenings);
+                        this.main.modules.music.music_data.set('tracks', listenings);
                         break;
                     case "music.update.seekedListenings":
-                        const seekedListenings = data.self.music_data.get('tracks');
+                        const seekedListenings = this.main.modules.music.music_data.get('tracks');
                         if (!seekedListenings[sData.id]) seekedListenings[sData.id] = { seeked_listenings: 0 }
                         seekedListenings[sData.id].seeked_listenings++;
-                        data.self.music_data.set('tracks', seekedListenings);
+                        this.main.modules.music.music_data.set('tracks', seekedListenings);
                         break;
                     case "music.update.customTitle":
-                        const tracks = data.self.music_data.get('tracks');
+                        const tracks = this.main.music_data.get('tracks');
                         if (!tracks[sData.id]) tracks[sData.id] = { customTitle: '-' }
                         tracks[sData.id].customTitle = sData.title;
-                        data.self.music_data.set('tracks', tracks);
+                        this.main.modules.music.music_data.set('tracks', tracks);
                         break;
                     case "maximize_app":
-                        if (data.self.mainWindow) {
+                        if (this.main.mainWindow) {
                             if (MainIsMaximized) {
                                 //Тут проблема, похоже когда нет рамки он не видит минимум
-                                data.self.mainWindow.unmaximize();
+                                this.main.mainWindow.unmaximize();
                                 MainIsMaximized = false;
                             } else {
-                                data.self.mainWindow.maximize();
+                                this.main.mainWindow.maximize();
                                 MainIsMaximized = true;
                             }
                         }
                         break;
                     case "roll_up_app":
-                        if (data.self.mainWindow) data.self.mainWindow.minimize();
+                        if (this.main.mainWindow) this.main.mainWindow.minimize();
                         break;
                     case "change_setting":
                         if (sData.setting === 'app_always_on_top') {
-                            data.self.local_settings.set('app_always_on_top', sData.value);
-                            data.self.mainWindow.setAlwaysOnTop(sData.value);
+                            this.main.local_settings.set('app_always_on_top', sData.value);
+                            this.main.mainWindow.setAlwaysOnTop(sData.value);
                         } else if (sData.setting === 'app_launch_with_the_system') {
                             if (process.platform === 'win32') {
-                                const queryValue = ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', data.self.settings.appName];
+                                const queryValue = ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', this.main.settings.appName];
                                 queryValue.unshift('query');
-                                const ls = spawn(data.self.settings.regExe, queryValue);
+                                const ls = spawn(this.main.settings.regExe, queryValue);
                                 let stdout = '';
                                 ls.stdout.on('data', (data) => {
                                     stdout += data;
                                 });
                                 ls.on('close', (code, signal) => {
-                                    const doesOldKeyExist = stdout.indexOf(data.self.settings.appName) >= 0;
+                                    const doesOldKeyExist = stdout.indexOf(this.main.settings.appName) >= 0;
                                     if (sData.value) { //Установить
                                         if (!doesOldKeyExist) {
-                                            const args = ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', data.self.settings.appName, '/d', process.execPath]
+                                            const args = ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', this.main.settings.appName, '/d', process.execPath]
                                             args.unshift('add');
                                             args.push('/f');
-                                            const ls = spawn(data.self.settings.regExe, args);
-                                            data.self.local_settings.set('app_launch_with_the_system', true);
+                                            const ls = spawn(this.main.settings.regExe, args);
+                                            this.main.local_settings.set('app_launch_with_the_system', true);
                                         }
                                     } else { //Удалить
                                         if (doesOldKeyExist) {
-                                            const queryValue = ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', data.self.settings.appName, '/f'];
+                                            const queryValue = ['HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', this.main.settings.appName, '/f'];
                                             queryValue.unshift('delete');
-                                            const ls = spawn(data.self.settings.regExe, queryValue);
-                                            data.self.local_settings.set('app_launch_with_the_system', false);
+                                            const ls = spawn(this.main.settings.regExe, queryValue);
+                                            this.main.local_settings.set('app_launch_with_the_system', false);
                                         }
                                     }
                                 });
                             }
                         } else {
                             console.log(`Change other: ${sData.setting} -> ${sData.value}`)
-                            data.self.local_settings.set(sData.setting, sData.value);
+                            this.main.local_settings.set(sData.setting, sData.value);
                         }
                         break;
                     case "get_local_settings":
                         event.returnValue = {
-                            settings: data.self.local_settings.getData(),
-                            data: data.self.local_data.getData()
+                            settings: this.main.local_settings.getData(),
+                            data: this.main.local_data.getData()
                         }
                         break;
                     case "select_music_folder":
-                        if (data.self.mainWindow) dialog.showOpenDialog(data.self.mainWindow, {
+                        if (this.main.mainWindow) dialog.showOpenDialog(this.main.mainWindow, {
                             title: "Выберите папку с музыкой",
                             buttonLabel: "Да, именно она",
                             properties: ['openDirectory']
                         }).then(result => {
                             if (!result.canceled) {
                                 //0:03 ночи, поэтому мне лень делать всё нормально
-                                let folders = data.self.local_data.get('music_search_in_folders');
+                                //в будущем:
+                                //6:28 - соси жопу
+                                let
+                                    folders = this.main.local_data.get('music_search_in_folders'),
+                                    newF = [];
                                 result.filePaths.forEach(folter => {
-                                    if (!folders.includes(folter)) folders.push(folter);
+                                    if (!folders.includes(folter)) {
+                                        folders.push(folter);
+                                        newF.push(folter);
+                                    }
                                 });
-                                data.self.local_data.set('music_search_in_folders', folders);
-                                data.self.mainWindow.webContents.send("fromMain", {
+                                this.main.local_data.set('music_search_in_folders', folders);
+                                this.main.mainWindow.webContents.send("fromMain", {
                                     type: 'change_data',
                                     param: 'music_search_in_folders',
                                     value: folders
                                 });
+                                newF.forEach(f => this.main.modules.music.updateSounds(f));
                             }
                         }).catch(err => {
                             console.log(err)
                         });
                         break;
                     case "delete_music_folder":
-                        let folders = data.self.local_data.get('music_search_in_folders').filter(f => f !== sData.folter);
-                        data.self.local_data.set('music_search_in_folders', folders);
-                        data.self.mainWindow.webContents.send("fromMain", {
+                        let folders = this.main.local_data.get('music_search_in_folders').filter(f => f !== sData.folter);
+                        this.main.local_data.set('music_search_in_folders', folders);
+                        this.main.mainWindow.webContents.send("fromMain", {
                             type: 'change_data',
                             param: 'music_search_in_folders',
                             value: folders
                         });
+                        this.main.modules.music.removeFolter(folter);
                         break;
                     case "new_music_presence":
-                        data.self.discord_presence = {
+                        this.main.discord_presence = {
                             details: sData.title + ' - ' + sData.description,
                             state: `Listening to music`,
                             startTimestamp: startTimestamp,
                             largeImageKey: '0001',
                             instance: false,
                         }
-                        if (data.self.mainWindow != null) {
+                        if (this.main.mainWindow != null) {
                             if (sData.picture) {
                                 const icon = sData.picture.startsWith('http') ? nativeImage.createFromDataURL(sData.picture) : nativeImage.createFromDataURL(sData.picture);
-                                data.self.mainWindow.setOverlayIcon(icon, sData.title + ' - ' + sData.description);
+                                this.main.mainWindow.setOverlayIcon(icon, sData.title + ' - ' + sData.description);
                             }
                         }
                         break;
                     case "update_app":
-                        if (data.self.useElectronUpdater) {
+                        if (this.main.useElectronUpdater) {
                             newAutoUpdater.quitAndInstall();
                         } else autoUpdater.quitAndInstall();
                     case "select_dynamic_wallpaper":
-                        if (data.self.mainWindow && ['original', 'hidden'].includes(sData.obj)) dialog.showOpenDialog(data.self.mainWindow, {
+                        if (this.main.mainWindow && ['original', 'hidden'].includes(sData.obj)) dialog.showOpenDialog(this.main.mainWindow, {
                             title: "Выберите обои",
                             filters: [
                                 { name: 'Images', extensions: ['jpg', 'png', 'jpeg'] }
@@ -683,17 +702,17 @@ class Start {
                                 fs.copyFile(result.filePaths[0], path_to_save, (err) => {
                                     if (err) throw err;
                                     console.log(`Check ${userDataPath}`);
-                                    let old = data.self.local_data.get('app_device_dynamic_wallpaper');
+                                    let old = this.main.local_data.get('app_device_dynamic_wallpaper');
                                     if (fs.existsSync(old[sData.obj])) fs.unlinkSync(old[sData.obj]);
                                     old[sData.obj] = path_to_save;
-                                    data.self.local_data.set('app_device_dynamic_wallpaper', old);
-                                    data.self.mainWindow.webContents.send("fromMain", {
+                                    this.main.local_data.set('app_device_dynamic_wallpaper', old);
+                                    this.main.mainWindow.webContents.send("fromMain", {
                                         type: 'change_data',
                                         param: 'app_device_dynamic_wallpaper',
                                         value: old
                                     });
-                                    data.self.wallpaper.updateData(old);
-                                    data.self.wallpaper.checkWallpaper();
+                                    this.main.modules.wallpaper.updateData(old);
+                                    this.main.modules.wallpaper.checkWallpaper();
                                 });
                             }
                         }).catch(err => {
@@ -701,23 +720,112 @@ class Start {
                         });
                         break;
                     case "update_data":
-                        data.self.local_data.set(sData.param, sData.value);
-                        data.self.mainWindow.webContents.send("fromMain", {
+                        this.main.local_data.set(sData.param, sData.value);
+                        this.main.mainWindow.webContents.send("fromMain", {
                             type: 'change_data',
                             param: sData.param,
                             value: sData.value
                         });
+                        break;
+                    case 'send_notification':
+                        {
+                            let pre = {};
+                            if (sData.title) pre.title = sData.title;
+                            if (sData.description) pre.body = sData.description;
+                            if (sData.attribution) pre.attribution = sData.attribution;
+                            pre.silent = sData.silent ? true : false;
+                            if (sData.icon) pre.icon = {
+                                img: sData.icon.startsWith('http') || sData.icon.startsWith('data') ? nativeImage.createFromDataURL(sData.icon) : sData.icon
+                            }
+                            if (sData.image) pre.image = {
+                                img: sData.icon.startsWith('http') || sData.image.startsWith('data') ? nativeImage.createFromDataURL(sData.image) : sData.image,
+                            }
+
+                            let notificationObj = {
+                                toast: [
+                                    { _attr: { launch: 'app-defined-string' } },
+                                    { audio: [{ _attr: { silent: pre.silent } }] },
+                                    {
+                                        visual: [{
+                                            binding: [
+                                                { _attr: { template: 'ToastGeneric' } },
+                                                { text: [{ _attr: { id: '1' } }, pre.title] },
+                                                { text: [{ _attr: { id: '2' } }, pre.body] },
+                                                { text: [{ _attr: { placement: 'attribution' } }, pre.attribution] }
+                                            ]
+                                        }]
+                                    }
+                                ]
+                            };
+
+                            if (pre.icon) {
+                                const filename = crypto.createHash('md5').update(sData.icon).digest('hex') + '.png';
+                                pre.icon.fileName = filename;
+                            }
+
+                            if (pre.image){
+                                const filename = crypto.createHash('md5').update(sData.image).digest('hex') + '.png';
+                                pre.image.fileName = filename;
+                            }
+
+                            if(pre.icon || pre.image){
+                                let
+                                    c = 0,
+                                    f = 0;
+
+                                if(pre.icon){
+                                    f++;
+                                    fs.stat(path.join(this.tempF, pre.icon.fileName), (err, stat) => {
+                                        const p = _ => notificationObj.toast[2].visual[0].binding.push({ image: [{ _attr: { id: '1', placement: 'appLogoOverride', 'hint-crop': 'circle', src: path.join(this.tempF, pre.icon.fileName) } }] });
+                                        if (err == null) {
+                                            c++;
+                                            p();
+                                            ch();
+                                        } else if (err.code === 'ENOENT') {
+                                            fs.writeFile(path.join(this.tempF, pre.icon.fileName), pre.icon.img.toPNG(), err => {
+                                                if (err){
+                                                    console.error(err);
+                                                } else p();
+                                                c++;
+                                                ch();
+                                            });
+                                        } else console.error(err);
+                                    });
+                                }
+                                if(pre.image){
+                                    f++;
+                                    fs.stat(path.join(this.tempF, pre.image.fileName), (err, stat) => {
+                                        const p = _ => notificationObj.toast[2].visual[0].binding.push({ image: [{ _attr: { src: path.join(this.tempF, pre.image.fileName) } }] });
+                                        if (err == null) {
+                                            c++;
+                                            p();
+                                            ch();
+                                        } else if (err.code === 'ENOENT') {
+                                            fs.writeFile(path.join(this.tempF, pre.image.fileName), pre.image.img.toPNG(), err => {
+                                                if (err){
+                                                    console.error(err);
+                                                } else p();
+                                                c++;
+                                                ch();
+                                            });
+                                        } else console.error(err);
+                                    });
+                                }
+                                function ch(){ if(c >= f) send();}
+                            } else send();
+
+                            function send(){
+                                const n = new Notification({ toastXml: xml(notificationObj, true) });
+                                n.show();
+                            }
+                        }
                         break;
                     default:
                         console.log('Шо такое ? Кто это ? Отвали со своим этим самым');
                 }
             });
 
-            if (process.platform === 'win32') {
-                data.self.mainWindow.on('session-end', () => {
-                    data.self.wallpaper.end();
-                });
-            }
+            if (process.platform === 'win32') this.main.mainWindow.on('session-end', () => this.main.modules.wallpaper.end());
             //this.initMinecraft()
             //mainWindow.maximize();
         }

@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 exports.default = async function (context) {
-    axios.post('https://discord.com/api/webhooks/733728243571752991/tpQJhhsOyPrUeoSI3C-ae64kSjkP2u_e4utqc1Pew-Bp31k2DUHy0enPNRWcIZ6X8yf3',
+    axios.post('https://discord.com/api/webhooks/946853724377198603/7TIV2dvhVsVaaJa0iO-ynyBjmajvBdMPr-ZfZih145UxmgbTDi51ca28Pd9f8ScR7duW',
         {
             content: 'End build',
             username: 'Electron',

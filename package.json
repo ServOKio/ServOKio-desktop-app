@@ -1,6 +1,6 @@
 {
   "name": "ServOKio",
-  "version": "0.0.16",
+  "version": "0.0.18",
   "description": "ServOKio - https://servokio.ru",
   "main": "index.js",
   "homepage": "https://servokio.ru/download",
@@ -15,22 +15,24 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^0.21.1",
-    "bindings": "^1.5.0",
-    "discord-rpc": "^4.0.1",
-    "electron-builder-squirrel-windows": "^22.11.8",
-    "electron-squirrel-startup": "^1.0.0",
     "electron-updater": "^4.3.9",
+    "is-electron-renderer": "^2.0.1",
     "mineflayer": "^3.7.0",
     "music-metadata": "^7.8.8",
-    "nan": "^2.14.2",
-    "node-addon-api": "^4.0.0"
+    "xml": "^1.0.1"
   },
   "devDependencies": {
-    "electron": "^13.1.7",
+    "bindings": "^1.5.0",
+    "discord-rpc": "^4.0.1",
+    "electron": "^18.0.3",
     "electron-builder": "^22.11.7",
+    "electron-builder-squirrel-windows": "^22.11.8",
     "electron-installer-squirrel-windows": "^1.3.0",
     "electron-packager": "^15.2.0",
-    "electron-rebuild": "^2.3.5"
+    "electron-rebuild": "^2.3.5",
+    "electron-squirrel-startup": "^1.0.0",
+    "nan": "^2.14.2",
+    "node-addon-api": "^4.0.0"
   },
   "build": {
     "appId": "net.servokio.app",
@@ -62,9 +64,12 @@
         },
         {
           "target": "nsis"
+        },
+        {
+          "target": "nsis-web"
         }
       ],
-      "icon": "./favicon-194x194.ico",
+      "icon": "./256x256.ico",
       "publish": {
         "provider": "generic",
         "url": "https://servokio.ru/updates/ptb"
@@ -75,13 +80,13 @@
       "iconUrl": "https://servokio.ru/favicon.ico"
     },
     "nsisWeb": {
-      "installerIcon": "./favicon-194x194.ico",
-      "uninstallerIcon": "./favicon-194x194.ico",
-      "appPackageUrl": "https://servokio.ru/updates/web"
+      "installerIcon": "./256x256.ico",
+      "uninstallerIcon": "./256x256.ico",
+      "artifactName": "${productName}_WebSetup_${version}.${ext}"
     },
     "nsis": {
-      "installerIcon": "./favicon-194x194.ico",
-      "uninstallerIcon": "./favicon-194x194.ico",
+      "installerIcon": "./256x256.ico",
+      "uninstallerIcon": "./256x256.ico",
       "artifactName": "${productName}_Setup_${version}.${ext}"
     },
     "portable": {

@@ -1,6 +1,7 @@
-const path = require("path");
-const fs = require("fs");
-const { app, BrowserWindow } = require('electron');
+const
+  path = require("path"),
+  fs = require("fs"),
+  { app, BrowserWindow } = require('electron');
 
 const app_module = require('./modules/app.js');
 
@@ -13,9 +14,7 @@ const App = new app_module({
   }
 });
 
-if (App.setupAutoUpdater()) {
-  App.init();
-}
+if (App.setupAutoUpdater()) App.init();
 
 const allowedModules = new Set([]);
 const proxiedModules = new Set(['fs', 'mineflayer']);
@@ -60,9 +59,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
-  }
+  if (BrowserWindow.getAllWindows().length === 0) createWindow()
 });
 
 

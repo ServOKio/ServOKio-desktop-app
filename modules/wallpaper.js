@@ -1,4 +1,3 @@
-const { throws } = require("assert");
 const
     path = require("path"),
     fs = require("fs");
@@ -6,9 +5,8 @@ const
 class Wallpaper {
     constructor(options = {}) {
         const addon_path = path.join(__dirname, '..', 'addons', 'addon.node');
-        console.log(`Wallpaper module path: ${addon_path}`)
+        console.log(`Wallpaper module path: ${addon_path}`);
         this.addon = require(addon_path);
-        console.log(this.addon)
 
         this.wallpaper_state = {
             data: options.data ? options.data : {
