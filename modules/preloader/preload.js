@@ -5,8 +5,6 @@ const {
 } = require("electron");
 const fs = require("fs");
 
-// Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld(
     "sapi", {
         send: (channel, data) => {
@@ -49,7 +47,7 @@ contextBridge.exposeInMainWorld(
                 }
             }
         },
-        remote: ()=>{
+        remote: _ => {
             return remote;
         },
     }

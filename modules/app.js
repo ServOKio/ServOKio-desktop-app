@@ -110,7 +110,8 @@ class App {
                 center: true,
                 show: false,
                 webPreferences: {
-                    nodeIntegration: true
+                    contextIsolation: true,
+                    preload: path.join(__dirname, './preloader/preload.js'),
                 }
             },
             main_screen_settings: {
@@ -139,6 +140,7 @@ class App {
                 titleBarStyle: this.develop.enable ? this.develop.titleBarStyle : 'hidden'
             },
             servokio_stats_url: 'https://servokio.ru/hello',
+            servokio_stats_url_extra: 'https://raw.githubusercontent.com/ServOKio/ServOKio-Dev/main/hello.json',
             appName: path.basename(process.execPath, '.exe'),
             regExe: process.env.SystemRoot ? `${process.env.SystemRoot}\\System32\\reg.exe` : 'reg.exe'
         }

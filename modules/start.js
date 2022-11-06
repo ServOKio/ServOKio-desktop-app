@@ -13,6 +13,8 @@ class Start {
     constructor(props = {}) {
         this.main = props.main;
         this.tempF = path.join(os.tmpdir(), 'servokio');
+        this.getStatsFail = 0;
+        this.getStatsFailExtra = false;
     }
 
     start(data) {
@@ -28,7 +30,7 @@ class Start {
 
         //Display splash
         this.main.splashWindow = new SplashWindow();
-        this.main.splashWindow.init(this.main.settings, data.app, () => this.main.mainWindow == null, () => {
+        this.main.splashWindow.init(this.main.settings, data.app, _ => this.main.mainWindow == null, _ => {
             console.log('Splash initlfsidf koro4e done');
             this.check_status(data);
         });
@@ -47,13 +49,13 @@ class Start {
             });
         }
 
-        data.app.whenReady().then(() => {
+        data.app.whenReady().then(_ => {
             //Трей
             let tray = new Tray(process.platform === 'win32' ? path.join(__dirname, '..', 'favicon-194x194.ico') : path.join(__dirname, '..', 'linux_256.png'));
             const contextMenu = Menu.buildFromTemplate([
                 {
                     label: 'Show App',
-                    click: () => {
+                    click: _ => {
                         if (this.main.mainWindow) this.main.mainWindow.show();
                     }
                 },
@@ -85,7 +87,7 @@ class Start {
                                 {
                                     label: 'Стандарт',
                                     sublabel: 'По центру экрана, стандартный размер',
-                                    click: () => {
+                                    click: _ => {
                                         this.main.local_data.set('app_position', {
                                             type: 'default',
                                             bounds: this.main.local_data.get('app_position').bounds
@@ -95,7 +97,7 @@ class Start {
                                 {
                                     label: 'Текущая',
                                     sublabel: 'Запомнить текущую позицию и размеры',
-                                    click: () => {
+                                    click: _ => {
                                         this.main.local_data.set('app_position', {
                                             type: 'custom',
                                             bounds: this.main.mainWindow.getBounds()
@@ -111,13 +113,13 @@ class Start {
                 },
                 {
                     label: 'WebSite',
-                    click: () => {
+                    click: _ => {
                         shell.openExternal('https://servokio.ru')
                     }
                 },
                 {
                     label: 'Gratitudes',
-                    click: () => {
+                    click: _ => {
                         shell.openExternal('https://servokio.ru/party')
                     }
                 },
@@ -126,7 +128,7 @@ class Start {
                 },
                 {
                     label: 'Проверить обновления',
-                    click: () => {
+                    click: _ => {
                         if (this.main.useElectronUpdater) {
                             newAutoUpdater.checkForUpdates();
                         } else {
@@ -136,7 +138,7 @@ class Start {
                 },
                 {
                     label: 'Close ' + require('./../package.json').version,
-                    click: () => {
+                    click: _ => {
                         console.log('close')
                         if (this.main.splashWindow) this.main.splashWindow.end();
                         if (this.main.mainWindow) this.main.mainWindow.close();
@@ -147,7 +149,7 @@ class Start {
             ]);
             tray.setToolTip('ServOKio');
             tray.setContextMenu(contextMenu);
-            tray.on('click', () => {
+            tray.on('click', _ => {
                 if (this.main.mainWindow) this.main.mainWindow.show();
             });
 
@@ -163,21 +165,24 @@ class Start {
 
     check_status(data) {
         function isJson(str) { try { JSON.parse(str); } catch (e) { return false; } return true; }
-        const getter = this.main.settings.servokio_stats_url.startsWith('https') ? require('https') : require('http');
-        console.log(`Stats from ${this.main.settings.servokio_stats_url}`);
-        getter.get(this.main.settings.servokio_stats_url, (res) => {
+        const urlGET = this.getStatsFailExtra ? this.main.settings.servokio_stats_url_extra : `${this.main.settings.servokio_stats_url}${this.getStatsFail > 3 ? '.json' : ''}`;
+        const getter = urlGET.startsWith('https') ? require('https') : require('http');
+        console.log(`Stats from ${urlGET}`);
+        this.main.splashWindow.log('The beginning of obtaining the status...');
+        getter.get(urlGET, (res) => {
             const { statusCode } = res;
             if (statusCode !== 200) {
                 console.error("Error getting update information");
+                this.main.splashWindow.log(`Error getting update information (${statusCode})`);
                 console.log(`A new attempt to get information will be made via: ${this.main.settings.retry_after_error}ms`);
-                setTimeout(() => {
+                setTimeout(_ => {
                     this.check_status(data);
                 }, this.main.settings.retry_after_error);
             } else {
                 res.setEncoding('utf8');
                 let rawData = '';
                 res.on('data', (chunk) => { rawData += chunk });
-                res.on('end', () => {
+                res.on('end', _ => {
                     if (isJson(rawData)) {
                         const stats = JSON.parse(rawData);
                         if (!this.main.develop.enable) {
@@ -189,34 +194,29 @@ class Start {
                                 autoUpdater.setFeedURL(`https://${stats.domain}/updates` + '?v=' + app.getVersion());
                                 this.setupAutoUpdaterEvents(data);
                             }
-                        } else {
-                            // const rpc = new DiscordRPC.Client({ transport: 'ipc' });
-                            // const clientId = stats.discord_client_id;
-                            // rpc.login({ clientId }).catch(console.error);
-                            // const setActivity = async () => {
-                            //     if (!rpc || !this.mainWindow) {
-                            //         return;
-                            //     }
-                            //     this.mainWindow.webContents.executeJavaScript('window.boops');
-                            //     rpc.setActivity(this.discord_presence);
-                            // }
-                            // rpc.on('ready', () => {
-                            //     setActivity();
-
-                            //     // activity can only be set every 15 seconds
-                            //     setInterval(() => {
-                            //         setActivity();
-                            //     }, 15e3);
-                            // });
                         }
                         this.startMain(data);
-                    } else console.error("The server returned an invalid response.")
+                    } else {
+                        console.error("The server returned an invalid response.");
+                        this.main.splashWindow.log(`The server returned an invalid response (${res.headers['content-type']})`);
+                        this.main.splashWindow.log(`A new attempt to get information will be made via: ${this.main.settings.retry_after_error}ms`);
+                        this.getStatsFail++;
+                        if(this.getStatsFail === 4){
+                            this.main.splashWindow.log(`Attempt to read information from .json...`);
+                        }
+                        if(this.getStatsFail > 4) {
+                            this.getStatsFailExtra = true;
+                        }
+                        setTimeout(_ => {
+                            this.check_status(data);
+                        }, this.main.settings.retry_after_error);
+                    }
                 });
             }
         }).on('error', (err) => {
             console.error("Error: " + err);
             console.log(`A new attempt to get information will be made via: ${this.main.settings.retry_after_error}ms`);
-            setTimeout(() => {
+            setTimeout(_ => {
                 this.check_status(data);
             }, this.main.settings.retry_after_error);
         })
@@ -231,7 +231,7 @@ class Start {
             console.log(`Update url: ${autoUpdater.getFeedURL()}`);
         }
 
-        setTimeout(() => {
+        setTimeout(_ => {
             if (this.main.useElectronUpdater) {
                 newAutoUpdater.checkForUpdates();
             } else {
@@ -239,7 +239,7 @@ class Start {
             }
         }, 10 * 1000);
 
-        this.main.autoupdater_interval = setInterval(() => {
+        this.main.autoupdater_interval = setInterval(_ => {
             if (this.main.useElectronUpdater) {
                 newAutoUpdater.checkForUpdates();
             } else {
@@ -254,17 +254,17 @@ class Start {
                 console.error(error);
             });
 
-            newAutoUpdater.on('checking-for-update', () => {
+            newAutoUpdater.on('checking-for-update', _ => {
                 console.log(`Check for updates`);
                 if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'checking' });
             });
 
-            newAutoUpdater.on('update-available', () => {
+            newAutoUpdater.on('update-available', _ => {
                 console.log(`An update is available`);
                 if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'available' });
             });
 
-            newAutoUpdater.on('update-not-available', () => {
+            newAutoUpdater.on('update-not-available', _ => {
                 console.log(`No updates found`);
                 if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'not_available' });
             });
@@ -285,7 +285,7 @@ class Start {
                 n.show();
             });
 
-            newAutoUpdater.on('before-quit-for-update', () => {
+            newAutoUpdater.on('before-quit-for-update', _ => {
                 console.log(`bgau`);
             });
         } else {
@@ -295,17 +295,17 @@ class Start {
                 console.error(error);
             });
 
-            autoUpdater.on('checking-for-update', () => {
+            autoUpdater.on('checking-for-update', _ => {
                 console.log(`Check for updates`);
                 if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'checking' });
             });
 
-            autoUpdater.on('update-available', () => {
+            autoUpdater.on('update-available', _ => {
                 console.log(`An update is available`);
                 if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'available' });
             });
 
-            autoUpdater.on('update-not-available', () => {
+            autoUpdater.on('update-not-available', _ => {
                 console.log(`No updates found`);
                 if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'not_available' });
             });
@@ -315,7 +315,7 @@ class Start {
                 if (this.main.mainWindow !== null) this.main.mainWindow.webContents.send("fromMain", { type: 'update_updater_status_lol', status: 'downloaded' });
             });
 
-            autoUpdater.on('before-quit-for-update', () => {
+            autoUpdater.on('before-quit-for-update', _ => {
                 console.log(`bgau`);
             });
         }
@@ -336,9 +336,9 @@ class Start {
                 shell.openExternal(windowURL);
             });
 
-            this.main.mainWindow.webContents.once('dom-ready', () => {
+            this.main.mainWindow.webContents.once('dom-ready', _ => {
                 console.log('main loaded');
-                if (this.main.splashWindow) setTimeout(() => this.main.splashWindow.nukeWindow(), 100);
+                if (this.main.splashWindow) setTimeout(_ => this.main.splashWindow.nukeWindow(), 100);
 
                 this.main.mainWindow.show();
                 this.main.mainWindow.setAlwaysOnTop(this.main.local_settings.get('app_always_on_top'));
@@ -349,7 +349,6 @@ class Start {
             const isMac = process.platform === 'darwin'
 
             Menu.setApplicationMenu(Menu.buildFromTemplate([
-                // { role: 'appMenu' }
                 ...(isMac ? [{
                     label: app.name,
                     submenu: [
@@ -364,14 +363,12 @@ class Start {
                         { role: 'quit' }
                     ]
                 }] : []),
-                // { role: 'fileMenu' }
                 {
                     label: 'File',
                     submenu: [
                         isMac ? { role: 'close' } : { role: 'quit' }
                     ]
                 },
-                // { role: 'editMenu' }
                 {
                     label: 'Edit',
                     submenu: [
@@ -400,7 +397,6 @@ class Start {
                         ])
                     ]
                 },
-                // { role: 'viewMenu' }
                 {
                     label: 'View',
                     submenu: [
@@ -415,7 +411,6 @@ class Start {
                         { role: 'togglefullscreen' }
                     ]
                 },
-                // { role: 'windowMenu' }
                 {
                     label: 'Window',
                     submenu: [
@@ -436,7 +431,7 @@ class Start {
                     submenu: [
                         {
                             label: 'Learn More',
-                            click: async () => {
+                            click: async _ => {
                                 const { shell } = require('electron')
                                 await shell.openExternal('https://electronjs.org')
                             }
@@ -471,7 +466,7 @@ class Start {
                                 {
                                     label: 'Стандарт',
                                     sublabel: 'По центру экрана, стандартный размер',
-                                    click: () => {
+                                    click: _ => {
                                         this.main.local_data.set('app_position', {
                                             type: 'default',
                                             bounds: this.main.local_data.get('app_position').bounds
@@ -481,7 +476,7 @@ class Start {
                                 {
                                     label: 'Текущая',
                                     sublabel: 'Запомнить текущую позицию и размеры',
-                                    click: () => {
+                                    click: _ => {
                                         this.main.local_data.set('app_position', {
                                             type: 'custom',
                                             bounds: this.main.mainWindow.getBounds()
@@ -500,7 +495,7 @@ class Start {
             function updateImages() {
                 function readPath(path_location) {
                     //console.log(path_location)
-                    setTimeout(() => {
+                    setTimeout(_ => {
                         fs.readdir(path_location, (err, files) => {
                             if (err) {
                                 console.log(err);
@@ -825,7 +820,7 @@ class Start {
                 }
             });
 
-            if (process.platform === 'win32') this.main.mainWindow.on('session-end', () => this.main.modules.wallpaper.end());
+            if (process.platform === 'win32') this.main.mainWindow.on('session-end', _ => this.main.modules.wallpaper.end());
             //this.initMinecraft()
             //mainWindow.maximize();
         }

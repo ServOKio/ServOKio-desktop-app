@@ -16,20 +16,23 @@
     </div>
   </div>
   <div class="debug">
-    <div class="block">Node <span>
-        <script>document.write(process.versions.node)</script></span></div>
-    <div class="block">Chrome <span>
-        <script>document.write(process.versions.chrome)</script></span></div>
-    <div class="block">Electron <span>
-        <script>document.write(process.versions.electron)</script></span></div>
-    <div class="block">HOME <span>
-        <script>document.write(process.env.HOME)</script></span></div>
+    <div class="log">Loading...</div>
   </div>
   <script>
-    window.sapi.receive("fromMain", (data) => {
+    function addLog(message){
+      const p = document.createElement('div');
+      p.classList.add('log');
+      p.innerText = message;
+      document.getElementsByClassName('debug')[0].appendChild(p);
+    }
+    window.sapi.receive("fromMain", data => {
       console.log(`Received ${data} from main process`);
+      console.log(data);
+      if(data.type === 'new_log'){
+        addLog(data.message);
+      }
     });
-    window.sapi.send("toMain", "some data");
+    //window.sapi.send("toMain", "some data");
   </script>
 </body>
 

@@ -95,6 +95,14 @@ class SplashWindow {
     end(){
         if(this.splashWindow) this.splashWindow.close();
     }
+
+    get(){
+        return this.splashWindow;
+    }
+
+    log(message){
+        this.splashWindow.webContents.send("fromMain", { type: 'new_log', message: message });
+    }
 }
 
 module.exports = SplashWindow;
